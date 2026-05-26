@@ -1,184 +1,534 @@
-# ZTAI — Zero Trust AI Sentinel
+<div align="center">
 
-> **"Never Trust, Always Verify"**  
-> 쿠버네티스 기반 제로트러스트 보안 아키텍처 구축 및 AI 위협 탐지 자동화 프로젝트
+# 🛡️ ZETTY — Zero Trust + UBA SOC
 
----
+**Z**ero Trust + S**e**curi**tt**y = **ZETTY**
 
-## 프로젝트 소개
+> **"Never Trust, Always Verify — _and when verify fails, Detect."_**
+> 2025 쿠팡 JWT 키 유출 사고 모티브 · 두 축 방어 체계 (KMS 선제차단 + UBA 사후탐지)
+> **아주대 캡스톤 · Google × Ajou AI Capstone Design · 파란학기제**
 
-가상의 네트워크 인프라망 내에서 발생하는 보안 이벤트의 **수집 → 분석 → 탐지 → 대응**을 자동화하고, 위협 판단 기준을 학습하는 **AI 모델**을 개발하는 프로젝트입니다.
+[![Backend](https://img.shields.io/badge/backend-Spring%20Boot%203.5%20%2B%20KMS%20ES256-brightgreen)](https://github.com/ZETTY-ZEROTRUST/backend)
+[![UBA](https://img.shields.io/badge/uba--analyzer-Claude%20Haiku%204.5%20%2B%20Sonnet%204.6-orange)](https://github.com/ZETTY-ZEROTRUST/uba-analyzer)
+[![Pipeline](https://img.shields.io/badge/log--pipeline-Nginx%20PEP%20%2B%20Filebeat%20%2B%20ES%20ingest-blue)](https://github.com/ZETTY-ZEROTRUST/log-pipeline)
+[![Attack](https://img.shields.io/badge/attack--simulation-S2%20%E2%80%93%20S8%206%20Scenarios-red)](https://github.com/ZETTY-ZEROTRUST/attack-simulation)
+[![ZT](https://img.shields.io/badge/KISA-Zero%20Trust%20Guideline%202.0-blueviolet)](#)
 
-기존 경계망 보안(망분리) 환경은 내부망 진입 이후의 행위를 통제하지 못하는 구조적 한계를 가지고 있습니다. 본 프로젝트는 제로트러스트 가이드라인 2.0을 기반으로, 쿠버네티스 위에 PDP/PEP/PIP 아키텍처를 구현하고 AI 엔진으로 위협을 자동 탐지·대응하는 보안 인프라를 구축합니다.
-
-**🎯 제로트러스트 성숙도 목표 : `향상(Enhanced)`**
-
-> "초기" 단계는 기본적인 인증·인가 수준에 머무르지만, "향상" 단계에서는 6대 핵심 요소 전반에 걸쳐 동적 정책 판단, 지속적 모니터링, 자동화된 위협 대응이 구현되어야 합니다. 본 프로젝트의 "AI 기반 이벤트 수집·분석·탐지·대응 자동화" 목표는 정확히 이 단계에서 요구하는 역량과 맞닿아 있습니다.
-
----
-
-## 🐻 팀명 : ZETTY
-
-**Z**ero Trust + S**e**curi**t****t**y = **ZETTY**
+</div>
 
 ---
 
-## 👥 R&R
+## ⚡ 30초 요약
 
-| 역할 | 담당 | 설명 |
-|---|---|---|
-| A : 인프라 + IaC | TBD | K8s 클러스터 구축, Terraform, CI/CD 파이프라인, 위협 관리 |
-| B : K8s + Mesh + ZT Control | TBD | Istio, Kong, Keycloak, OPA, 위협 분석 |
-| C : Security + Observability + AI | TBD | ELK, Falco, AI 탐지 모델 개발, 데이터 분석 |
-| D : App + Data + Dashboard | TBD | MSA 개발, Vault, 가시화 대시보드 |
+ZETTY 는 **2025 쿠팡 개인정보 유출 사고** (전직원이 JWT 서명키를 탈취해 7개월간 수천만 건 토큰 위조 — 미탐지) 를 모티브로 한 **두 축 방어 체계** 의 PoC 입니다.
 
----
+- 🔐 **KMS** = 선제적 차단 (전제조건). 하드코딩 JWT 서명키를 **AWS KMS ES256 (ECC_NIST_P256 비대칭)** 으로 분리 → `kms:Sign` 권한과 `kms:GetPublicKey` 권한 분리로 _키 누출의 영향 면을 축소_
+- 🔍 **UBA** = 사후 탐지 (**본체**). 키가 유출되더라도 행위 패턴으로 잡는 **7 팩터 채점 + Claude ReAct + 3 MCP 도구** 의 사용자 행위 분석 엔진
+- 🎯 **범위 = 탐지 + 알림 까지**. 차단 / 자동 격리 절대 X (의도). 본 시점에서 PoC 가 증명하려는 것은 _"잡힌다"_
+- 🚫 **학습 / 파인튜닝 안 함**. LLM 은 추론만. GPU 예산 0 / 라벨 데이터 0
 
-## 🎯 핵심 목표
-
-| 목표 | 설명 |
-|---|---|
-| **맥락 기반 위협 판단** | 사용자·시스템·네트워크 간 흐름을 파악해 전체 맥락을 기반으로 위협 판단 |
-| **AI 위협 평가** | AI가 위험도를 자동 분석하고 대응이 필요한 위협을 선별 |
-| **공격 표면 관리** | 내·외부 통신 경계에서 디지털 자산 탐지, 구성 취약점·노출 포트·잘못된 접근 권한 점검 |
-| **로그 기반 행위 추적** | 공격자의 행위 단서를 추적하고 침입 경로 및 피해 범위 규명 |
+> 🎯 **멘토 확정 스토리라인**: "사고 조사를 해봤더니 _KMS 키 관리에 문제_ → _KMS로 해결_ → 그럼에도 키가 유출됐을 경우를 대비해 _UBA로 감시·통제_"
 
 ---
 
-## 🔥 목적 및 필요성
+## 🎬 한 줄 시연 — 6 시나리오 → 5~15 분 후 Slack pop
 
-### 개발 동기
+```bash
+# S2 토큰 하이재킹 + 자동 UBA 분석 (~5분 후 Slack pop)
+python demo_s2.py
 
-**1. 기존 경계망 보안(망분리)의 구조적 한계**
+# S5 IP 분산 enum + 자동 UBA 분석 (~5분 후 Slack pop)
+python demo_s5.py
 
-기존 경계망 보안은 사용자의 권한만 확인할 뿐, 내부망에서의 행동까지 관리·감시하지 못합니다. 협력 업체의 자격 증명이 유출되면 공격자가 내부망에서 자유롭게 활동할 수 있는 치명적 취약점이 존재합니다.
+# S4 + S6 일괄 시연 (병렬, 시연용)
+./run.sh demo
+```
 
-- 2014~2015 미국 연방 인사관리처(OPM) 개인정보 유출 사고 — 협력 업체 자격 증명 유출로 내부망 침입
-- 2020 솔라윈즈(SolarWinds) 공급망 공격 — 서드파티 소프트웨어를 통한 내부 시스템 침해
+| 단계 | 이벤트 | 소요 |
+|------|--------|------|
+| t=0 | 공격 시나리오 발사 (XFF 위조 트래픽) | 시나리오별 |
+| t≈30s | Nginx PEP access.log → Filebeat → ES `filebeat-*` 색인 | 30 초 |
+| t=5m | UBA `cron_pipeline.sh` → 7 팩터 채점 | ~30 초 |
+| t≈6~7m | Claude Haiku 4.5 ReAct + 3 MCP 도구 → 한국어 인시던트 리포트 | ~1 분 |
+| **t=5~15m** | 🔔 **Slack 알람 pop + Kibana 패널 spike** | — |
+| 다음날 09:05 KST | Claude Sonnet 4.6 일일 캠페인 인텔리전스 | — |
 
-**2. 클라우드·원격근무 확산으로 경계가 사라진 환경**
-
-해외 지사 확장, SaaS/AI 서비스 도입, 원격근무 등으로 "내부"와 "외부"의 경계가 무의미해졌습니다. IP 기반 접근 제어만으로는 새로운 IT 환경에 대응할 수 없습니다.
-
-**3. 보안 자동화에 대한 필요성**
-
-수동 보안 관리는 비용이 높고 대응 속도가 느립니다. AI 기반 자동 탐지·대응 체계를 구축하면 인적 자원과 보안 관리 비용을 줄이면서 위협 대응 속도를 비약적으로 높일 수 있습니다.
-
-### 필요성
-
-> 제로트러스트 환경은 정상 사용자의 자격 증명이 유출되더라도, 접속 IP·시간·요청 리소스 등 현재 접근의 컨텍스트를 분석하여 동적으로 접근 허용 여부를 판단하고 비정상적 접근을 차단합니다.
-
-- 모든 접근을 검증하고, 내부 통신도 암호화(mTLS)
-- 실시간 모니터링과 AI 기반 이상 탐지로 위협을 조기에 발견
-- 자동 대응(격리, 세션 만료)으로 피해 확산을 최소화
-- 누가 언제 어떤 자원에 접근했는지 기록·추적하여 감사 지원
+→ **MTTD = 5~15분** (S4 enumeration) / **6~24h** (S6 Slow & Low)
 
 ---
 
-## 👀 서비스 타겟층 정의
+## 🏗️ 전체 아키텍처 — AWS Multi-AZ + 5 레포 협력
+
+```mermaid
+flowchart LR
+    SIM[🎯 attack-simulation<br/>S2/S4/S5/S5b/S6/S8] -->|XFF 위조 + ES256 forge| ALB
+    subgraph VPC["ZETI VPC — ap-northeast-2"]
+        ALB[ALB<br/>public-2a/2b]
+        subgraph WEB["priv-web 2a/2b"]
+            NGX[🛡️ log-pipeline<br/>Nginx PEP<br/>uba.conf]
+        end
+        subgraph APP["priv-app 2a/2b"]
+            AUTH[🔐 backend<br/>auth-server<br/>JWT 발급]
+            API[🪪 backend<br/>api-server<br/>JWT 검증 + IDOR]
+        end
+        subgraph DB["priv-db 2a/2b"]
+            RDS[(RDS MySQL<br/>Multi-AZ)]
+        end
+        subgraph MON["priv-monitor-2a"]
+            ELK[(ELK<br/>10.0.41.10)]
+            UBA[🔍 uba-analyzer<br/>Python<br/>10.0.41.20]
+        end
+    end
+    ALB --> NGX
+    NGX --> AUTH
+    NGX --> API
+    AUTH --> RDS
+    API --> RDS
+    AUTH -->|kms:Sign| KMS[(AWS KMS<br/>ECC_NIST_P256)]
+    API -->|kms:GetPublicKey<br/>5min cache| KMS
+    NGX -.Filebeat 5044.-> ELK
+    ELK -- ingest pipeline<br/>jwt-decode + asn-classify --> ELK
+    UBA -->|9200 ES query| ELK
+    UBA -->|HTTPS| ANT[(Claude<br/>Haiku 4.5 / Sonnet 4.6)]
+    UBA -->|stdio MCP| MITRE[mitre-attack-mcp]
+    UBA -->|stdio MCP| CVE[cve-mcp-server]
+    UBA -->|webhook| SLK[🔔 Slack<br/>#zeti-uba-alerts]
+```
+
+### 🔐 SG 체인 (Zero Trust 핵심)
+
+```
+alb-sg ──80──> nginx-sg ──8080/8081──> app-sg ──3306──> db-sg
+nginx-sg / app-sg ──5044──> elk-sg
+uba-sg ──9200──> elk-sg
+uba-sg, elk-sg ──443──> 0.0.0.0/0  (NAT → Slack / Anthropic API)
+```
+
+> **원칙**: 인바운드는 항상 **SG 참조** (IP 아님). IP 변경 무관, ZT "신원 기반" 에 부합. SSH 키·베스천 없음, **AWS SSM Session Manager** 만 사용.
+
+### 🌐 AWS 인프라 — 단일 VPC Multi-AZ
+
+| Tier | CIDR (2a / 2b) | 워크로드 | 책임 |
+|------|---------------|---------|------|
+| public | 10.0.1/2.0/24 | ALB, NAT GW | 외부 진입 |
+| **priv-web** | 10.0.11/12.0/24 | **Nginx PEP** | PEP — 단일 게이트 |
+| **priv-app** | 10.0.21/22.0/24 | **auth-server :8080 / api-server :8081** | JWT 발급·검증 |
+| **priv-db** | 10.0.31/32.0/24 | RDS MySQL Multi-AZ | 데이터 |
+| **priv-monitor** | 10.0.41/42.0/24 | **ELK + UBA Python** | 관제 |
+
+---
+
+## 📂 5 레포 매트릭스
+
+| 레포 | 언어 | 핵심 책임 | KMS 권한 | ZT 매핑 |
+|------|------|-----------|---------|--------|
+| [**`backend`**](https://github.com/ZETTY-ZEROTRUST/backend) | Java 17 / Spring Boot 3.5 | Auth + API · **JWT ES256 발급/검증** · 의도된 4 취약점 (IDOR/MOCK OTP/하드코딩 키 잔재) | `kms:Sign` (auth) + `kms:GetPublicKey` (api, 5분 캐시) | 보호 대상 |
+| [**`log-pipeline`**](https://github.com/ZETTY-ZEROTRUST/log-pipeline) | Nginx conf / JSON / YAML | Nginx PEP · Filebeat · **ES ingest 2단 chain (jwt-decode + asn-classify)** · 7 ES 매핑 · IaC | — | **PEP** + 관제 |
+| [**`uba-analyzer`**](https://github.com/ZETTY-ZEROTRUST/uba-analyzer) | Python 3.11+ | **7 팩터 채점 + Claude ReAct (Haiku 3a / Sonnet 3b)** + 3 MCP 도구 + Slack 알림 | — | **PDP / PIP** |
+| [**`attack-simulation`**](https://github.com/ZETTY-ZEROTRUST/attack-simulation) | Python | **6 공격 시나리오** (S2/S4/S5/S5b/S6/S8) · XFF 위조 · ES256 forge · `demo_*.py` 시연 자동화 | — | 검증 트래픽 |
+| [**`.github`**](https://github.com/ZETTY-ZEROTRUST/.github) | Markdown | **Org Overview README** (본 문서) | — | — |
+
+### 📦 레포 간 데이터 계약
+
+```mermaid
+flowchart LR
+    AS[backend<br/>auth-server] -->|11 클레임 JWT| BE_API[backend<br/>api-server]
+    AS -.access.log JSON.-> LP[log-pipeline<br/>Nginx PEP]
+    BE_API -.access.log JSON.-> LP
+    LP -->|filebeat-* 색인<br/>jwt.* + ip_class| UBA[uba-analyzer]
+    UBA -->|uba-alerts<br/>+ Slack| SOC[👤 SOC 담당자]
+    AT[attack-simulation] -.XFF 위조 트래픽.-> LP
+    AT -.forge_token ES256.-> BE_API
+```
+
+| 인터페이스 | 생성 | 소비 | 형식 |
+|-----------|------|------|------|
+| 11 클레임 JWT | `backend/auth-server` | `backend/api-server` + `uba-analyzer` | ES256 Base64URL |
+| Nginx access log | `log-pipeline/nginx-pep/uba.conf` | `log-pipeline/filebeat` → ES | JSON 9 필드 (`uba_log`) |
+| `jwt.*` 분해된 필드 | `log-pipeline/es-pipelines/jwt-decode` (Painless) | `uba-analyzer` Phase 1 | ES doc |
+| `ip_class` (cgnat_kr / cloud / unknown) | `log-pipeline/es-pipelines/asn-classify` (geoip + Painless) | `uba-analyzer` `factor_engine` | ES doc |
+| `uba-risk-scores` final_score ≥ 70 | `uba-analyzer` Phase 2 | `uba-analyzer` Phase 3a 폴러 | ES doc |
+| `uba-alerts-{date}` | `uba-analyzer` Phase 3a | Slack + Kibana | LLM JSON |
+
+---
+
+## 🪪 JWT 11 클레임 — 쿠팡 실 페이로드 그대로
+
+```json
+{
+  "sub": "140000511",              // ★ 사용자 ID — 의도된 V2 (순차 정수)
+  "jti": "0d93a42a-adbe-4b1f-...", // ★ 토큰 단위 추적자 — UBA token_replay 시그널
+  "iat": 1778056393,
+  "exp": 1778056993,               // TTL 600초 / 10분 — S8 의 위반 대상
+  "iss": "https://auth.zeti.com/",
+  "aud": ["https://api.zeti.com"],
+  "client_id": "zeti-web",
+  "scp": ["openid", "core"],
+  "acr": "aal1",                   // 인증 강도 — MFA 우회 탐지 (V4)
+  "amr": ["pwd"],                  // 인증 방법
+  "ext": {
+    "LSID": "d8fa308d-4a3e-...",   // ★★ 세션 단위 추적자 — 단일 세션 다중 IP/토큰 탐지
+    "fiat": 1778056393,            // 최초 인증 시각 — 이상 행위 시점 보정
+    "v": 2
+  }
+}
+```
+
+> JWT 는 stateless. **`ext.LSID` 가 토큰 안에 박힌 발급 시점 세션 식별자** — 토큰 탈취 시 LSID 매칭으로 패턴 추적 가능 (S2 시나리오의 본질).
+
+---
+
+## 🚨 의도된 4 취약점 — 절대 "수정" 금지
+
+| ID | 위치 | 취약점 | UBA 검증 신호 |
+|----|------|--------|--------------|
+| **V1** | backend (잔재) | 하드코딩 JWT 서명키 (KMS 전환 전 상태) | 위조 토큰의 비정상 페이로드 검출 |
+| **V2** | `User.id : Long` | 순차 정수 PK (`sub = 140000xxx`) | 글로벌 sub 단조 시퀀스 — enumeration factor |
+| **V3** | `GET /addresses/{userId}` · `/orders/{userId}` · `/users/{userId}` | JWT `sub` vs path `userId` 일치 검증 누락 = **IDOR** | `F-DiversityIPSub`: 단일 IP × 다수 sub 조회 |
+| **V4** | `POST /auth/stepup` | MOCK OTP `"123456"` | step-up 우회 시도 패턴 |
+
+> `door_password` 평문 응답은 V3 의 부속 — **쿠팡 유출 데이터에서 가장 민감한 카테고리** 재현이라 일부러 평문 노출.
+
+**TO-BE**:
+- V1 → ✅ **AWS KMS 로 전환 완료** (`backend/auth-server/jwt/KmsJwtSigner.java`)
+- V2 → UUID 랜덤 (점진 migration)
+- V3 → **UBA 탐지** (차단 아님 — 본 PoC 범위는 _탐지 + 알림_)
+- V4 → 실 TOTP / Twilio SMS
+
+---
+
+## 🧮 UBA 7 Factor — 결정론 + 통계 + Override
+
+3 계열로 분류, 각 다른 의미 / cap / 합성식.
+
+| 영문 키 | 한국어 (UI) | 계열 | 타깃 | cap | 발동 조건 |
+|---------|------------|------|------|-----|----------|
+| `token_violation` | 토큰규격위반 | **결정론** | user | 100 | exp 만료·sub 비정수·iss 불일치·서명 검증 실패 |
+| `token_replay` | 토큰재현 | **결정론** | user | 100 | 단일 jti × 다중 IP — ip_country 교차 base 55, ip_class 교차 base 35 + fan-out |
+| `request_burst` | 요청수급증 | 통계 (z) | user | 25 | `max(0, z−2) × 5` (cold_start n<100 시 0점) |
+| `response_size_burst` | 응답크기급증 | 통계 (z) | user | 30 | `max(0, z−2) × 6` |
+| `cumulative_exfil` | 누적유출량 | 통계 (z) | IP | 50 | `max(0, z−2) × 10` (3일 EMA 대비) |
+| `ip_user_diversity` | IP-사용자다양성 | **Override** | IP | 100 | 단일 IP × 다수 sub → 즉시 100 (cgnat_kr 화이트리스트 soft cap 30) |
+| `response_sensitivity` | 응답민감도 | **Override** | user | 100 | `/api/addresses` 등 민감 endpoint × 비정상 빈도 |
+
+### 최종 점수 합성
+
+```
+final_score = min(100, max(
+    overrides...,                            # ip_user_diversity / response_sensitivity → 100
+    deterministic + 0.3 × Σ(statistical)     # 통계는 보조 신호 (0.3 가중)
+))
+```
+
+---
+
+## 🤖 LLM 통합 — Haiku 단발 / Sonnet 일일
+
+| Phase | 실행 주기 | 모델 | 평균 토큰 (입/출) | 책임 |
+|-------|----------|------|-----------------|------|
+| **Phase 3a** (단발 알람) | 1분 cron 폴러 | `claude-haiku-4-5-20251001` | 600 / 1200 | MTTD 5~15분, 1알람 ≤ $0.01 |
+| **Phase 3b** (일일 캠페인) | 일 1회 09:05 KST | `claude-sonnet-4-6` | 4000 / 2500 | 장문 캠페인 추론, 위협그룹 추정 |
+
+### ReAct 루프 + 3 MCP 도구
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant FE as factor_engine
+    participant TG as TriggerGate<br/>(score floor + throttle + cost guard)
+    participant CL as Claude Haiku 4.5
+    participant ES as zeti-es-mcp<br/>(stdio Python)
+    participant MIT as mitre-attack-mcp<br/>(stdio pipx)
+    participant NVD as cve-mcp-server<br/>(stdio uv)
+    participant GR as grounding.validate<br/>(환각 strip)
+    participant SLK as Slack
+
+    FE->>TG: risk doc (final_score=87)
+    TG->>CL: messages.create(tools=[ES, MITRE, NVD])
+    loop ReAct (max N iter)
+        CL-->>TG: tool_use
+        alt query_elasticsearch
+            TG->>ES: baseline / 시계열 enrich
+        else search_mitre_attack
+            TG->>MIT: TTPs lookup
+        else search_nvd_cve
+            TG->>NVD: CVE / EPSS / KEV
+        end
+    end
+    CL-->>GR: final JSON {요약, 증거, MITRE, 권고}
+    GR-->>SLK: 한국어 인시던트 리포트<br/>(환각 MITRE/CVE ID 제거)
+```
+
+> **중요**: LLM 은 점수 / attacker_level 을 산출하지 **않음**. 그 결정권은 `factor_engine` 만. LLM 은 추론 + 컨텍스트 부여만.
+
+---
+
+## 🎯 공격 시나리오 매트릭스 — 회피 수준별
+
+`attack-simulation` 의 6 시나리오는 **공격자의 회피 수준** 별로 단계화되어 있어, 각 단계가 UBA 의 어떤 factor 가 잡는지를 _데이터로_ 입증:
+
+| 수준 | 시나리오 | 회피 기술 | 잡혀야 할 factor | MTTD 목표 |
+|------|---------|----------|------------------|----------|
+| 0 (어설픔) | **S4** Enumeration | 회피 없음, 단일 AWS Seoul IP | `ip_user_diversity` override 100 | 5~15분 |
+| 1 (IP만 가림) | **S5** Distributed (sub 순차) | IP 분산, sub 순차 | 글로벌 sub 시퀀스 + Route B ASN 다양성 | 15분 |
+| 2 (완전 분산) | **S5b** Distributed (sub random) | IP + sub 모두 random | 보완 factor (`F-FirstSeen-Sensitive`) | — |
+| 3 (시간 회피) | **S6** Slow & Low | 분당 1~2건 + US Residential IP | `cumulative_exfil` 24h + Impossible Travel | 6~24h |
+| 4 (토큰 변형) | **S8** 장수명 토큰 | TTL 7200s = 정상 12배 | `token_violation` T007 (exp-iat>3600) → 80 | 5~15분 |
+| ★ | **S2** Token Hijack | 위조 X, 진짜 토큰 + 회선 점프 (KT→Cafe) | `token_replay` (jti 공유 + ip_class 교차) | 5~15분 |
+
+### 🎨 IP 색깔 매트릭스 (prefix 만 봐도 시나리오 식별)
+
+| prefix | 시나리오 | 실제 ASN |
+|--------|---------|----------|
+| `15.x` | S4 | AWS Asia Pacific (Seoul) AS16509 |
+| `98.x` | S6 | US Residential (Comcast 류) |
+| `222.x` | S2 victim | KT Corporation AS4766 |
+| `101.x` | S2 attacker | Public WiFi / Cafe |
+| `203.0.113` / `198.51.100` / `192.0.2` / `45.32.x` | S5 풀 | Mixed Hosting / VPS |
+
+---
+
+## 🛠️ Tech Stack
+
+| 영역 | 스택 | 레포 |
+|------|------|------|
+| **Language** | Java 17 (Corretto) · Python 3.11+ | backend · uba-analyzer / attack-simulation |
+| **Framework** | Spring Boot 3.5 · Spring Security · Gradle (Kotlin DSL) | backend |
+| **JWT 라이브러리** | **Nimbus JOSE JWT 9.x** 만 (jjwt 금지) | backend |
+| **Crypto** | AWS KMS · `ECC_NIST_P256` · **ES256** 비대칭 | backend |
+| **PEP** | Nginx 1.24+ · `set_real_ip_from` + `real_ip_recursive` | log-pipeline |
+| **Log Shipper** | Filebeat 8.x · filestream + ndjson parser | log-pipeline |
+| **Search Engine** | Elasticsearch 8.x · composable template + ILM · **Painless ingest** | log-pipeline |
+| **GeoIP** | MaxMind GeoLite2-ASN + GeoLite2-City | log-pipeline |
+| **LLM (단발)** | Anthropic `claude-haiku-4-5-20251001` | uba-analyzer |
+| **LLM (일일)** | Anthropic `claude-sonnet-4-6` | uba-analyzer |
+| **Tool Use** | Anthropic Messages API ReAct | uba-analyzer |
+| **MCP** | stdio transport · `zeti-es-mcp / mitre-attack-mcp / cve-mcp-server` | uba-analyzer |
+| **알림** | Slack Incoming Webhook + dedupe + 한국어 리포트 | uba-analyzer/alerting |
+| **시각화** | Kibana 8.x · 3-layer 정합 대시보드 | uba-analyzer/infra |
+| **AWS** | ALB · EC2 · RDS Multi-AZ · KMS · SSM · S3 · CloudWatch · SNS | log-pipeline/infrastructure |
+| **CI/CD** | GitHub Actions (각 레포) | All |
+| **IaC** | **Terraform (예정)** — 현재 AWS 콘솔 수기 + `console-changes.md` 기록 | log-pipeline |
+| **접근** | AWS Session Manager (SSM) — **SSH 키 없음, 베스천 없음** | All EC2 |
+
+---
+
+## 🧭 Why → How → Impact → Deliverable
+
+### 1️⃣ Why — 쿠팡 사고가 보여준 두 가지 결함
+
+| 결함 | 원인 |
+|------|------|
+| 7개월 미탐지 | **명확한 룰 기반은 7개월 저속 유출 같은 케이스 못 잡음** (분당 RPS 룰 미달) + 과탐 동반 |
+| 키 누출 시 즉시 위조 가능 | **하드코딩 서명키** — 동일 키 = Sign + Verify, 코드/yaml 평문, CloudTrail 감사 없음 |
+| 분산 enumeration 사각지대 | 단일 IP factor 모두 0점 — IP 분산하면 무력화 |
+| API 인가 누락 | 사용자 ID 순차 9자리 정수 + JWT sub vs path 일치 검증 누락 (IDOR) |
+| MFA 우회 | step-up MOCK OTP 시연 |
+
+### 2️⃣ How — 두 축 방어 체계
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  KMS 선제차단 (전제조건)                                       │
+│  ─────────────────────                                       │
+│  • 하드코딩 키 → AWS KMS HSM (export 불가)                     │
+│  • 키 분리: kms:Sign (auth) ↔ kms:GetPublicKey (api)         │
+│  • 알고리즘: HS256 (대칭) → ES256 (ECC_NIST_P256 비대칭)        │
+│  • CloudTrail 자동 감사                                       │
+└─────────────────────────────────────────────────────────────┘
+                          ↓ "그럼에도 키가 유출됐다면"
+┌─────────────────────────────────────────────────────────────┐
+│  UBA 사후탐지 (본체)                                          │
+│  ────────────────                                            │
+│  • 결정론 (token_violation / token_replay) — 룰 매칭 즉시 점수  │
+│  • 통계 (z-score 3종) — baseline 분포 대비 (cold_start 보호)   │
+│  • Override (ip_user_diversity / response_sensitivity) → 100 │
+│  • Claude ReAct + 3 MCP 도구 (ES/MITRE/CVE) + 환각 strip       │
+│  • Trigger Gate (score floor + throttle + cost guard)        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 3️⃣ Impact — 정량 KPI
+
+| KPI | Before (쿠팡 시점) | After (ZETI) |
+|-----|------------------|-------------|
+| 키 누출 시 즉시 위조 가능성 | ✅ (서버 코드에 키) | ❌ (KMS HSM) |
+| 키 회전 가능 시점 | 배포 주기 (주 단위) | KMS API 1 콜 |
+| 인가 누락 탐지 채널 | **없음** | UBA factor (`F-DiversityIPSub` 등) |
+| MTTD (S4 단일 IP enumeration) | 7개월+ (미탐지) | **5~15분** |
+| MTTD (S6 Slow & Low) | 7개월+ | **6~24h** |
+| LLM 비용 (Phase 3a 1알람) | — | ≤ $0.01 (Haiku 4.5) |
+| LLM 환각 MITRE/CVE ID strip | — | `grounding.validate_llm_output` 통과율 100% |
+| **두 축 방어 체계 효과** | — | _"키 유출이라도 탐지 + 알림"_ 검증 |
+
+### 4️⃣ Deliverable — SOC 워크플로 즉시 투입 가능한 산출물
+
+| 산출물 | 형식 | 활용 |
+|--------|------|------|
+| 🔔 **Slack 인시던트 리포트** (Phase 3a) | 한국어 요약 + 증거 + MITRE + 권고 | SOC 담당자 즉시 대응 |
+| 🔔 **Slack 일일 요약** (Phase 3b) | 24h 캠페인 분석 + 위협그룹 추정 | 매니저 보고 |
+| 📊 **Kibana 대시보드** | 3-layer 정합 (events / risk / alerts) | 분석가 헌팅 |
+| 📄 **`uba-alerts-{date}` ES doc** | LLM 산출 JSON 영구 보관 | 감사 추적 / ISMS-P |
+| 📄 **`uba-intelligence-{date}` ES doc** | 일일 캠페인 추론 | 보고서 |
+| 🎬 **`demo_*.py`** | S2/S5 단독 시연 진입점 + SSM trigger | 발표 영상 |
+| 📑 **KPI 측정 데이터** | MTTD / TPR / FPR (`docs/kpi/`) | 학술 보고서 |
+
+---
+
+## 📋 컴플라이언스 / 표준 매핑
+
+| 표준 | 본 시스템 매핑 |
+|------|---------------|
+| **KISA Zero Trust Guideline 2.0** | PEP (Nginx) + PDP/PIP (UBA `factor_engine` + LLM) — **성숙도 "향상" 단계** 목표 |
+| **NIST SP 800-207** | 동적 정책 결정 (baseline + override + LLM 추론) + micro-segmentation (priv-app/priv-db tier) |
+| **OWASP Top 10 A01** Broken Access Control | 의도된 IDOR (V3) — UBA 탐지로 보완 |
+| **OWASP A02** Cryptographic Failures | AWS KMS HSM + 권한 분리 |
+| **MITRE ATT&CK 정렬** | LLM 산출에 technique ID 자동 매핑 + `grounding` 환각 strip · T1078 (S2) / T1199 (S5) / T1110.004 (S4·S5) / T1078.004 (S6) |
+| **ISMS-P 침해사고 관리** | `uba-alerts / uba-intelligence` 영구 보관 → 감사 증빙 |
+| **금융보안원 C-TAS 호환** | IoC 추출 가능 형식 (IP/ASN/sub/jti) — 외부 인텔 공유 인터페이스 준비 |
+
+---
+
+## 👥 R&R — 본인 단독 진행
+
+명세상 캡스톤 팀 6명 (Team A 2명 + Team B 2명 + 공통 2명) 구조이지만, **실질 모든 트랙 (backend / log-pipeline / uba-analyzer / attack-simulation) 을 본인이 직접 처리**.
+
+| 트랙 | 담당 레포 | 본인 책임 |
+|------|----------|----------|
+| 백엔드 + 공격 | `backend` + `attack-simulation` | Spring Boot + KMS + 6 시나리오 |
+| 관제 인프라 | `log-pipeline` | Nginx PEP + Filebeat + ES ingest + IaC |
+| 탐지 엔진 | `uba-analyzer` | factor_engine + LLM ReAct + Slack |
+
+---
+
+## 👀 서비스 타겟층
 
 | 타겟 | 설명 |
-|---|---|
-| **보안 담당자** | 기존 경계망 보안의 한계를 인식하고, 제로트러스트로 전환을 계획 중인 실무자 |
-| **인프라 엔지니어** | 쿠버네티스 기반 환경에서 보안 정책을 코드로 관리하고 자동화하려는 DevSecOps 엔지니어 |
-| **보안 학습자** | 제로트러스트 개념을 실제 인프라 위에서 구현하며 학습하려는 학생·주니어 엔지니어 |
+|------|------|
+| **금융권 SOC 담당자** | 7개월 미탐지 같은 사고를 _두 축 방어_ 로 막고 싶은 실무자 |
+| **인프라 엔지니어** | AWS KMS + ES ingest pipeline + UBA 를 코드로 관리 (DevSecOps) |
+| **보안 학습자** | 쿠팡 사고를 _실제 인프라 위에서_ 재현·탐지하며 학습하려는 학생·주니어 |
 
----
-
-## 🧑‍💼 페르소나 설정
-
-### 페르소나 1 — 보안팀 리더 김보안 (35세)
+### 🧑‍💼 페르소나 — 보안팀 리더 김보안 (35세)
 
 - 100인 규모 IT 기업의 보안팀장
-- 최근 협력 업체 계정 탈취 시도가 발생해 경계망 보안의 한계를 체감
-- 제로트러스트 도입을 경영진에게 제안하고 싶지만, 구체적인 구현 사례와 효과 데이터가 부족
-- **Needs**: 실제 구현 사례, 성숙도 모델 기반 단계별 로드맵, 모의 침투를 통한 효과 검증
-
-### 페르소나 2 — DevOps 엔지니어 이클라우드 (28세)
-
-- 쿠버네티스 기반 서비스를 운영 중인 스타트업 엔지니어
-- 보안은 방화벽과 VPN에 의존하고 있으나, 내부 서비스 간 통신은 사실상 무방비 상태
-- 서비스 메시나 OPA 같은 도구는 들어봤지만 어떻게 조합해야 하는지 모름
-- **Needs**: 오픈소스 조합 가이드, IaC 기반 선언적 보안 정책 관리, 단계별 검증 방법
+- 협력사 계정 탈취 / 키 유출 시나리오에 대한 **탐지 채널** 부재를 체감
+- 제로트러스트 도입을 경영진에게 제안하고 싶지만, **구체적 효과 데이터** (MTTD / 비용) 부족
+- **Needs**: 쿠팡 사고 재현 + UBA 탐지 검증, KPI 정량 데이터 (`docs/kpi/SUMMARY.md`), Slack/Kibana 운영 산출물
 
 ---
 
-## 🔧 기술 스택
+## 🚀 Getting Started — 다섯 가지 진입점
 
-| 영역 | 기술 |
-|---|---|
-| **인프라** | Kubernetes (K3s), Terraform, Helm, Cilium CNI (eBPF) |
-| **Gateway / PEP** | Istio Ingress, Envoy Proxy, Kong Gateway |
-| **인증 / PDP** | Keycloak (OIDC/MFA), OPA/Rego, 신뢰도 엔진 |
-| **Service Mesh** | Istio (Envoy Sidecar), mTLS, NetworkPolicy |
-| **보안 제어** | cert-manager, Gatekeeper/Kyverno, RBAC, Vault |
-| **관측 / PIP** | ELK Stack, Prometheus, Grafana, Jaeger, Kiali, Falco |
-| **AI 위협 분석** | Anomaly Detection (Isolation Forest/Autoencoder), 로그 분류 (BERT), OSINT/CTI |
-| **자동 대응** | 위협 스코어링, SOAR, 자동 격리 (NetworkPolicy) |
-| **데이터** | PostgreSQL, Vault, Kafka |
-| **CI/CD / GitOps** | ArgoCD, GitHub Actions, Trivy+Cosign, Harbor |
-| **모의 침투** | Caldera, Infection Monkey, kube-hunter, OWASP ZAP, Atomic Red Team |
+각 레포는 독립 Git 레포이며, 본 Org overview 는 _전체 그림_ 만 제공합니다. 깊은 내용은 각 레포 README 로.
 
----
+```bash
+# 1) backend — Spring Boot Auth + API
+git clone git@github.com:ZETTY-ZEROTRUST/backend.git
+cd backend/auth-server && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun     # :8080
+cd ../api-server && SPRING_PROFILES_ACTIVE=local ./gradlew bootRun          # :8081
+cd ../scripts && ./all.sh                                                    # 8-step 시연
 
-## 💡 기술 스택 선정 이유
+# 2) log-pipeline — Nginx PEP + Filebeat + ES ingest
+git clone git@github.com:ZETTY-ZEROTRUST/log-pipeline.git
+cd log-pipeline
+./scripts/setup-es-ingest.sh && ./scripts/setup-es-uba-indices.sh
+./scripts/deploy-nginx-pep.sh
 
-| 기술 | 왜 이것을 쓰는가 |
-|---|---|
-| **Kubernetes** | 네임스페이스 기반 마이크로세그멘테이션, 서비스 메시(mTLS) 자동화, 선언적 정책 관리(GitOps)가 가능한 제로트러스트 구현의 사실상 표준 플랫폼 |
-| **K3s** | 풀 K8s 대비 리소스 소모가 적으면서 CRI/CNI/CSI 표준을 모두 준수, 소규모 팀 운영에 최적 |
-| **Cilium CNI** | eBPF 기반으로 커널 수준에서 L3/L4/L7 전 계층 트래픽을 제어·모니터링, iptables 대비 성능 우위 |
-| **Istio + Envoy** | 모든 Pod 간 통신에 mTLS 자동 적용, AuthorizationPolicy로 서비스 간 접근 세밀 제어 — "내부도 신뢰하지 않는" 원칙의 직접 구현 |
-| **Keycloak** | OIDC/SAML/MFA/조건부 접근을 오픈소스로 제공, 상용 IdP 없이 "향상" 단계의 인증 요구사항 충족 |
-| **OPA (Rego)** | CNCF 졸업 프로젝트, 접근 주체의 컨텍스트(IP, 시간, 리소스)를 분석해 동적으로 허용/차단 판단 |
-| **ELK Stack** | 로그 기반 행위 추적의 사실상 표준, Fluentd(CNCF 졸업)와 결합해 K8s 네이티브 로그 자동 수집 |
-| **Falco** | eBPF로 커널 수준 시스템 콜 감시, 컨테이너 내 비정상 행위(쉘 실행, 권한 상승) 실시간 탐지 |
-| **Vault** | 시크릿 관리, 동적 자격증명 발급, 암호화 as a Service, K8s ServiceAccount 기반 인증 |
-| **Kafka** | AI 엔진의 실시간 스트림 처리 + 배치 처리를 모두 지원하면서 데이터 유실 방지 |
-| **Caldera** | MITRE ATT&CK 기반 APT 시나리오 자동 실행으로 단계별 탐지·차단·가시화 검증 |
+# 3) uba-analyzer — 7 factor + Claude ReAct
+git clone git@github.com:ZETTY-ZEROTRUST/uba-analyzer.git
+cd uba-analyzer && pip install -r requirements.txt
+python3 pipeline.py --hours 72                                               # baseline 시드
+python3 llm-agent/orchestrator.py --phase 3a --input llm-agent/sample_alert_3a.json
 
----
+# 4) attack-simulation — 6 시나리오 + 시연 자동화
+git clone git@github.com:ZETTY-ZEROTRUST/attack-simulation.git
+cd attack-simulation && pip install -r requirements.txt
+python demo_s2.py                                                            # 5분 후 Slack pop
+python demo_s5.py
+```
 
-## 📂 레포지토리 구조
-
-| 레포지토리 | 설명 |
-|---|---|
-| `infra` | Terraform IaC, Helm Charts, K8s 매니페스트 |
-| `policy` | OPA/Rego 정책, Gatekeeper/Kyverno 제약 조건 |
-| `ai-engine` | AI 위협 탐지 모델, 로그 분류 파이프라인 |
-| `monitoring` | ELK, Prometheus, Grafana 대시보드 설정 |
-| `app-services` | 샘플 MSA 애플리케이션 |
-| `pentest` | Caldera, Infection Monkey 시나리오 |
-| `docs` | 프로젝트 문서, 아키텍처 설계서 |
+| 레포 | 상세 README |
+|------|-------------|
+| backend | https://github.com/ZETTY-ZEROTRUST/backend#readme |
+| log-pipeline | https://github.com/ZETTY-ZEROTRUST/log-pipeline#readme |
+| uba-analyzer | https://github.com/ZETTY-ZEROTRUST/uba-analyzer#readme |
+| attack-simulation | https://github.com/ZETTY-ZEROTRUST/attack-simulation#readme |
 
 ---
 
-## 📜 Commit Convention
+## 📜 Commit Convention (Org 표준)
 
-커밋 메시지 형식: `태그(#이슈번호): 내용`  
-예시: `Infra(#12): Istio Ingress Gateway 설정 추가`
+- **포맷**: `<type>(<scope>): <한글 subject>`
+- subject: 한글 50자 이내, 마침표 없이, 명령형
+- 한 commit = 한 의도. 기능+버그 / 리팩터+기능 분리.
 
-| 태그 | 설명 |
-|---|---|
-| `Feat` | 신규 기능 구현 |
-| `Fix` | 버그 수정 |
-| `Docs` | 문서 수정 |
-| `Infra` | 인프라 구성 변경 |
-| `Security` | 보안 정책/설정 변경 |
-| `Refactor` | 코드 리팩토링 |
-| `Test` | 테스트 코드 추가 |
-| `Chore` | 기타 변경사항 |
+| type | 설명 |
+|------|------|
+| `feat` | 신규 기능 |
+| `fix` | 버그 수정 |
+| `docs` | 문서 |
+| `chore` | 빌드/IDE/gitignore 등 |
+| `refactor` | 리팩토링 |
+| `ci` | CI/CD |
+| `merge` | 머지 |
+| `test` | 테스트 |
+
+| scope | 사용 레포 |
+|-------|----------|
+| `auth` | backend/auth-server |
+| `api` | backend/api-server |
+| `uba` | uba-analyzer |
+| `pipeline` | log-pipeline ES ingest/매핑 |
+| `nginx` | log-pipeline/nginx-pep |
+| `infra` | log-pipeline/infrastructure |
+| `llm` | uba-analyzer/llm-agent |
+| `kms` | KMS 통합 |
+| `db` | DB / 마이그레이션 |
+| `attack-sim` | attack-simulation |
+| `demo` | attack-simulation/demo_*.py |
+| `repo` | 레포 구조 변경 |
+| `docs` | 문서 |
+
+> 예: `feat(uba): Phase 3a 환각 strip 보강` · `docs(pipeline): asn-classify v11 _meta 정정` · `feat(demo): S2 단독 시연 진입점 추가`
+
+---
+
+## 🚫 절대 규칙 (Org 공통 DO NOT)
+
+- ❌ **의도된 4 취약점에 검증 추가 금지** — V1~V4 는 시연 자산
+- ❌ **`door_password` 평문 제거/암호화/마스킹 금지**
+- ❌ **JWT 알고리즘 대칭키 (HS256 등) 로 변경 금지** — ES256 + KMS 고정
+- ❌ **jjwt 사용 금지** — Nimbus JOSE 만
+- ❌ **Maven 마이그레이션 금지** — Gradle 고정
+- ❌ **LLM 이 점수 / attacker_level 산출하게 만들지 마라** — `factor_engine` 만 결정
+- ❌ **학습 / 파인튜닝 금지** — 추론만
+- ❌ **차단 / 자동 격리 코드 추가 금지** — PoC 범위는 _탐지 + 알림_
+- ❌ **`leaked-key/*.pem` `*.der` Git 커밋 금지**
+- ❌ **자체 인프라 외에서 `attack-simulation` 실행 금지**
 
 ---
 
 ## 📖 참고 자료
 
-- 제로트러스트 가이드라인 2.0 (KISA)
-- 제로트러스트 성숙도 모델 2.0
-- [맥미니로 시작하는 쿠버네티스](https://twentytwentyone.tistory.com/category/project/맥미니로%20시작하는%20쿠버네티스)
+- KISA **제로트러스트 가이드라인 2.0** + 성숙도 모델 2.0
+- NIST **SP 800-207** (Zero Trust Architecture)
+- OWASP Top 10 (2021) — A01 Broken Access Control · A02 Cryptographic Failures
+- MITRE ATT&CK — T1078 / T1199 / T1110 / T1078.004
+- Anthropic Claude API — Messages + Tool Use (ReAct)
+- Model Context Protocol (MCP) — stdio transport
+- 2025 쿠팡 개인정보 유출 사고 (전직원 JWT 키 탈취 → 7개월 미탐지)
 
 ---
 
-<p align="center">
-  <b>🔒 Never Trust · Always Verify · Continuously Monitor</b>
-</p>
+<div align="center">
+
+### 🔒 **Never Trust · Always Verify · _When Verify Fails, Detect_**
+
+**ZETTY** — Zero Trust + UBA SOC
+
+[`backend`](https://github.com/ZETTY-ZEROTRUST/backend) · [`log-pipeline`](https://github.com/ZETTY-ZEROTRUST/log-pipeline) · [`uba-analyzer`](https://github.com/ZETTY-ZEROTRUST/uba-analyzer) · [`attack-simulation`](https://github.com/ZETTY-ZEROTRUST/attack-simulation)
+
+*Google × Ajou AI Capstone Design · 파란학기제 · 아주대학교*
+
+</div>

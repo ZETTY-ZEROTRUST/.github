@@ -133,8 +133,8 @@ uba-sg, elk-sg ──443──> 0.0.0.0/0  (NAT → Slack / Anthropic API)
 ```mermaid
 flowchart LR
     AS[backend<br/>auth-server] -->|11 클레임 JWT| BE_API[backend<br/>api-server]
-    AS -.access.log JSON.-> LP[log-pipeline<br/>Nginx PEP]
-    BE_API -.access.log JSON.-> LP
+    AS -.->|access.log JSON| LP[log-pipeline<br/>Nginx PEP]
+    BE_API -.->|access.log JSON| LP
     LP -->|filebeat-* 색인<br/>jwt.* + ip_class| UBA[uba-analyzer]
     UBA -->|uba-alerts<br/>+ Slack| SOC[👤 SOC 담당자]
     AT[attack-simulation] -.XFF 위조 트래픽.-> LP

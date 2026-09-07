@@ -69,7 +69,7 @@ flowchart LR
         end
         subgraph APP["priv-app 2a/2b"]
             AUTH[🔐 backend<br/>auth-server<br/>JWT 발급]
-            API[🪪 backend<br/>api-server<br/>JWT 검증 + IDOR]
+            API[🪪 backend<br/>api-server<br/>JWT 검증 + 자기 자원 인가]
         end
         subgraph DB["priv-db 2a/2b"]
             RDS[(RDS MySQL<br/>Multi-AZ)]
@@ -122,7 +122,7 @@ uba-sg, elk-sg ──443──> 0.0.0.0/0  (NAT → Slack / Anthropic API)
 
 | 레포 | 언어 | 핵심 책임 | KMS 권한 | ZT 매핑 |
 |------|------|-----------|---------|--------|
-| [**`backend`**](https://github.com/ZETTY-ZEROTRUST/backend) | Java 17 / Spring Boot 3.5 | Auth + API · **JWT ES256 발급/검증** · 의도된 4 취약점 (IDOR/MOCK OTP/하드코딩 키 잔재) | `kms:Sign` (auth) + `kms:GetPublicKey` (api, 5분 캐시) | 보호 대상 |
+| [**`backend`**](https://github.com/ZETTY-ZEROTRUST/backend) | Java 17 / Spring Boot 3.5 | Auth + API · **JWT ES256 발급/검증** · JWT `sub` 기반 자기 자원 인가 | `kms:Sign` (auth) + `kms:GetPublicKey` (api, 5분 캐시) | 보호 대상 |
 | [**`log-pipeline`**](https://github.com/ZETTY-ZEROTRUST/log-pipeline) | Nginx conf / JSON / YAML | Nginx PEP · Filebeat · **ES ingest 2단 chain (jwt-decode + asn-classify)** · 7 ES 매핑 · IaC | — | **PEP** + 관제 |
 | [**`uba-analyzer`**](https://github.com/ZETTY-ZEROTRUST/uba-analyzer) | Python 3.11+ | **7 팩터 채점 + Claude ReAct (Haiku 3a / Sonnet 3b)** + 3 MCP 도구 + Slack 알림 | — | **PDP / PIP** |
 | [**`attack-simulation`**](https://github.com/ZETTY-ZEROTRUST/attack-simulation) | Python | **6 공격 시나리오** (S2/S4/S5/S5b/S6/S8) · XFF 위조 · ES256 forge · `demo_*.py` 시연 자동화 | — | 검증 트래픽 |
@@ -178,21 +178,19 @@ flowchart LR
 
 ---
 
-## 🚨 의도된 4 취약점 — 절대 "수정" 금지
+## 🚨 보존하는 실험 자산과 자원 인가 계약
 
 | ID | 위치 | 취약점 | UBA 검증 신호 |
 |----|------|--------|--------------|
 | **V1** | backend (잔재) | 하드코딩 JWT 서명키 (KMS 전환 전 상태) | 위조 토큰의 비정상 페이로드 검출 |
 | **V2** | `User.id : Long` | 순차 정수 PK (`sub = 140000xxx`) | 글로벌 sub 단조 시퀀스 — enumeration factor |
-| **V3** | `GET /addresses/{userId}` · `/orders/{userId}` · `/users/{userId}` | JWT `sub` vs path `userId` 일치 검증 누락 = **IDOR** | `F-DiversityIPSub`: 단일 IP × 다수 sub 조회 |
 | **V4** | `POST /auth/stepup` | MOCK OTP `"123456"` | step-up 우회 시도 패턴 |
 
-> `door_password` 평문 응답은 V3 의 부속 — **쿠팡 유출 데이터에서 가장 민감한 카테고리** 재현이라 일부러 평문 노출.
+> `door_password` 평문 응답은 키 유출 후 데이터 접근의 영향을 관측하는 fixture다. 자원 API는 path 사용자 ID를 받지 않고 검증된 token `sub`의 소유 범위만 반환한다.
 
 **TO-BE**:
 - V1 → ✅ **AWS KMS 로 전환 완료** (`backend/auth-server/jwt/KmsJwtSigner.java`)
 - V2 → UUID 랜덤 (점진 migration)
-- V3 → **UBA 탐지** (차단 아님 — 본 PoC 범위는 _탐지 + 알림_)
 - V4 → 실 TOTP / Twilio SMS
 
 ---
@@ -322,7 +320,7 @@ sequenceDiagram
 | 7개월 미탐지 | **명확한 룰 기반은 7개월 저속 유출 같은 케이스 못 잡음** (분당 RPS 룰 미달) + 과탐 동반 |
 | 키 누출 시 즉시 위조 가능 | **하드코딩 서명키** — 동일 키 = Sign + Verify, 코드/yaml 평문, CloudTrail 감사 없음 |
 | 분산 enumeration 사각지대 | 단일 IP factor 모두 0점 — IP 분산하면 무력화 |
-| API 인가 누락 | 사용자 ID 순차 9자리 정수 + JWT sub vs path 일치 검증 누락 (IDOR) |
+| 키 유출 후 다계정 접근 | 공격자가 순차 사용자 ID를 token `sub`로 위조해 자기 자원 API 호출 |
 | MFA 우회 | step-up MOCK OTP 시연 |
 
 ### 2️⃣ How — 두 축 방어 체계
@@ -381,7 +379,7 @@ sequenceDiagram
 |------|---------------|
 | **KISA Zero Trust Guideline 2.0** | PEP (Nginx) + PDP/PIP (UBA `factor_engine` + LLM) — **성숙도 "향상" 단계** 목표 |
 | **NIST SP 800-207** | 동적 정책 결정 (baseline + override + LLM 추론) + micro-segmentation (priv-app/priv-db tier) |
-| **OWASP Top 10 A01** Broken Access Control | 의도된 IDOR (V3) — UBA 탐지로 보완 |
+| **OWASP API1:2023 BOLA** | JWT `sub` 기반 자기 자원 API와 repository 소유권 query로 예방 |
 | **OWASP A02** Cryptographic Failures | AWS KMS HSM + 권한 분리 |
 | **MITRE ATT&CK 정렬** | LLM 산출에 technique ID 자동 매핑 + `grounding` 환각 strip · T1078 (S2) / T1199 (S5) / T1110.004 (S4·S5) / T1078.004 (S6) |
 | **ISMS-P 침해사고 관리** | `uba-alerts / uba-intelligence` 영구 보관 → 감사 증빙 |
@@ -496,7 +494,8 @@ python demo_s5.py
 
 ## 🚫 절대 규칙 (Org 공통 DO NOT)
 
-- ❌ **의도된 4 취약점에 검증 추가 금지** — V1~V4 는 시연 자산
+- ❌ 순차 `sub`, MOCK OTP, 민감 응답 fixture와 문서화된 키 유출 재현 자산을 임의 변경 금지
+- ❌ path/query 사용자 ID로 인증 주체 범위를 대체 금지
 - ❌ **`door_password` 평문 제거/암호화/마스킹 금지**
 - ❌ **JWT 알고리즘 대칭키 (HS256 등) 로 변경 금지** — ES256 + KMS 고정
 - ❌ **jjwt 사용 금지** — Nimbus JOSE 만

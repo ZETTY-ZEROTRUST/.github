@@ -15,15 +15,15 @@ Auth/API → MySQL Outbox → Redis Streams → event-indexer → Elasticsearch
 
 | 저장소 | 책임 | 진입점 |
 |---|---|---|
-| backend | 인증·인가·토큰 발급·회수·BFF | [인증 구조](https://github.com/ZETTY-ZEROTRUST/backend/blob/chore/backend-guides/docs/auth-token-architecture.md) |
-| log-pipeline | 이벤트 계약·Outbox·Streams·ES·재처리 | [공통 계약](https://github.com/ZETTY-ZEROTRUST/log-pipeline/blob/chore/pipeline-guides/contracts/README.md) |
-| attack-simulation | 로컬 모의 계정의 공격·정상 대조군 | [시나리오](https://github.com/ZETTY-ZEROTRUST/attack-simulation/blob/chore/scenario-guides/README.md) |
-| zero-trust-architecture | Compose·TLS·네트워크·실행 복구 | [실행 안내](https://github.com/ZETTY-ZEROTRUST/zero-trust-architecture/blob/chore/infra-guides/compose/README.md) |
+| backend | 인증·인가·토큰 발급·회수·BFF | [인증 구조](https://github.com/ZETTY-ZEROTRUST/backend/blob/develop/docs/auth-token-architecture.md) |
+| log-pipeline | 이벤트 계약·Outbox·Streams·ES·재처리 | [공통 계약](https://github.com/ZETTY-ZEROTRUST/log-pipeline/blob/develop/contracts/README.md) |
+| attack-simulation | 로컬 모의 계정의 공격·정상 대조군 | [시나리오](https://github.com/ZETTY-ZEROTRUST/attack-simulation/blob/develop/README.md) |
+| zero-trust-architecture | Compose·TLS·네트워크·실행 복구 | [실행 안내](https://github.com/ZETTY-ZEROTRUST/zero-trust-architecture/blob/develop/compose/README.md) |
 
-링크는 이번 변경을 담은 저장소별 검토 브랜치를 가리킨다.
+링크는 이번 변경을 담은 저장소별 develop 브랜치를 가리킨다.
 
 ## 다음 작업
 
-[현재 네 시나리오](https://github.com/ZETTY-ZEROTRUST/attack-simulation/blob/chore/scenario-guides/README.md)의 공격·정상 대조군과 필요한 관측을 기준으로 재설계한다. 직접 머신러닝 학습 코드와 과거 평가 자료는 삭제했다. 목표는 backend 보안 이벤트를 log-pipeline에서 집계하고, uba-analyzer의 Jev가 평가·보고서를 작성해 Slack에 알리는 구조다. PostgreSQL 전환과 새 분석·알림 경로는 설계 단계이며 실제 연동·성능 검증 완료를 뜻하지 않는다.
+[현재 네 시나리오](https://github.com/ZETTY-ZEROTRUST/attack-simulation/blob/develop/README.md)의 공격·정상 대조군과 필요한 관측을 기준으로 재설계한다. 직접 머신러닝 학습 코드와 과거 평가 자료는 삭제했다. 목표는 backend 보안 이벤트를 log-pipeline에서 집계하고, uba-analyzer의 Jev가 평가·보고서를 작성해 Slack에 알리는 구조다. PostgreSQL 전환과 새 분석·알림 경로는 설계 단계이며 실제 연동·성능 검증 완료를 뜻하지 않는다.
 
 실행은 승인된 로컬 대상과 모의 계정에서 진행한다. 시나리오 초안·mock 결과를 실제 사고 방어 성능이나 AI 탐지 실측으로 표현하지 않는다.
